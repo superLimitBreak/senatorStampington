@@ -1,73 +1,49 @@
 package main
 
 import (
+	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/miekg/dns"
+	"github.com/SuperLimitBreak/senatorStampington/dnsServer"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-const (
-	domain   = "superlimitbreak.uk."
-	dnsPort  = ":53"
-	catchAll = "192.168.0.1"
-)
-
-var catchAllIP net.IP
-
 func main() {
-	log.Info("Dns Server starts")
-
-	dns.HandleFunc(".", handleDNS)
-
-	catchAllIP = net.ParseIP(catchAll).To4()
-	if catchAllIP == nil {
-		log.Fatal("failed to parse the catch all ip address")
+	// Create catch all dns server
+	server := dnsServer.CatchAll{
+		Domain: "superlimitbreak.uk.",
+		Port:   ":53",
+		IP:     net.ParseIP("192.168.0.1").To4(),
 	}
 
-	go serve("tcp")
-	go serve("udp")
-
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-}
-
-func serve(netType string) {
-	server := &dns.Server{Addr: dnsPort, Net: netType, TsigSecret: nil}
-
-	log.Infof("Serve %s", netType)
-
-	if err := server.ListenAndServe(); err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"NetType": netType,
-		}).Fatal("Failed to setup server")
+	// Wrap the serve method with exit logging
+	serveWrap := func(netType string) {
+		if err := server.Serve(netType); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"NetType": netType,
+			}).Fatal("Failed to setup server")
+		}
 	}
-}
 
-func handleDNS(w dns.ResponseWriter, r *dns.Msg) {
-	defer w.Close()
-	var (
-		rr dns.RR
-	)
+	// Start the two servers async
+	go serveWrap("tcp")
+	go serveWrap("udp")
 
-	msgResp := new(dns.Msg)
-	msgResp.SetReply(r)
-	msgResp.Compress = false
+	// create chanels to listen for os signals
+	exit := make(chan os.Signal)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 
-	rr = new(dns.A)
-	rr.(*dns.A).Hdr = dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
-	rr.(*dns.A).A = catchAllIP
+	// Seperate channel as we are expected to provide a core dump for a SIGQUIT
+	dump := make(chan os.Signal)
+	signal.Notify(dump, syscall.SIGQUIT)
 
-	switch r.Question[0].Qtype {
-	case dns.TypeA:
-		msgResp.Answer = append(msgResp.Answer, rr)
-	default:
-		//log
+	// Wait for a signal to exit
+	select {
+	case <-dump:
+		panic(errors.New("SIGQUIT received: panicing!"))
+	case <-exit:
 		return
 	}
-
-	w.WriteMsg(msgResp)
 }
