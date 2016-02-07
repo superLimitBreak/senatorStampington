@@ -13,9 +13,10 @@ import (
 func main() {
 	// Create catch all dns server
 	server := dnsServer.CatchAll{
-		Domain: "superlimitbreak.uk.",
-		Port:   ":53",
-		IP:     net.ParseIP("192.168.0.1").To4(),
+		Domain:      "superlimitbreak.uk.",
+		Port:        ":53",
+		IP:          net.ParseIP("192.168.0.1").To4(),
+		SpoofDomain: true,
 	}
 
 	// Wrap the serve method with exit logging

@@ -10,9 +10,10 @@ import (
 // requests an A record for any host.
 // It also has methods for running a dns server with these credentials.
 type CatchAll struct {
-	Domain string
-	Port   string
-	IP     net.IP
+	Domain      string
+	Port        string
+	IP          net.IP
+	SpoofDomain bool
 }
 
 // Serve starts a sever for a given net type (udp or tcp)
@@ -31,12 +32,20 @@ func (c *CatchAll) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 	defer w.Close()
 	var rr dns.RR
 
+	domainSpoof := r.Question[0].Name
+
 	msgResp := new(dns.Msg)
 	msgResp.SetReply(r)
 	msgResp.Compress = false
 
 	rr = new(dns.A)
-	rr.(*dns.A).Hdr = dns.RR_Header{Name: c.Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
+
+	if c.SpoofDomain {
+		rr.(*dns.A).Hdr = dns.RR_Header{Name: domainSpoof, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
+	} else {
+		rr.(*dns.A).Hdr = dns.RR_Header{Name: c.Domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
+	}
+
 	rr.(*dns.A).A = c.IP
 
 	switch r.Question[0].Qtype {
