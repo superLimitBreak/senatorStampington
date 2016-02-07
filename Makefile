@@ -18,10 +18,13 @@ ifeq ($(GO_DIR),)
 	@echo "You must pass the location of your go folder via GO_DIR. See make help"
 else
 	ln -s $(GO_DIR)/senatorStampington $(INSTALL_DIR)
-	ln -s $(MAKEFILE_PATH)/senatorStampington.service $(SYSTEMD_DIR)
+	cp $(MAKEFILE_PATH)/senatorStampington.service $(SYSTEMD_DIR)
+	systemctl daemon-reload && systemctl enable senatorStampington.service
+	@echo "senatorStampington.service enabled, use 'systemctl start' to start it now"
 endif
 
 .PHONY:
 clean:
+	systemctl disable senatorStampington.service && systemctl daemon-reload
 	rm $(INSTALL_DIR)senatorStampington $(SYSTEMD_DIR)senatorStampington.service
 
