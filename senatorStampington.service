@@ -1,0 +1,9 @@
+[Unit]
+Description=SenatorStampington - DNS capturer
+After=network.target
+
+[Service]
+ExecStart=/opt/senatorStampington
+
+[Install]
+WantedBy=multi-user.target
